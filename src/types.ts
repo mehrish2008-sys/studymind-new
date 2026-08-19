@@ -91,7 +91,20 @@ export interface RevisionNote {
   title: string;
   content: string;
   keyPoints: string[];
+
+  // Optional uploaded study material
+  attachments?: NoteAttachment[];
 }
+
+export interface NoteAttachment {
+  id: string;
+  noteId: string;
+  name: string;
+  type: string;
+  url: string;
+  size: number;
+}
+
 
 export interface PracticeQuestion {
   id: string;

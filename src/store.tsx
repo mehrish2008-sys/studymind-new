@@ -20,6 +20,7 @@ import type {
   SavedResource,
   Topic,
   RevisionNote,
+  NoteAttachment,
   Quiz,
   PracticeQuestion,
 } from '@/types';
@@ -72,6 +73,12 @@ interface AppState {
   addNote: (note: Omit<RevisionNote, 'id'>) => void;
   updateNote: (id: string, updates: Partial<RevisionNote>) => void;
   deleteNote: (id: string) => void;
+  reorderNotes: (subjectId: string, orderedIds: string[]) => void;
+
+  uploadNoteAttachment: (
+    noteId: string,
+    file: File
+  ) => Promise<NoteAttachment | null>;
 
   addGeneratedQuiz: (quiz: Quiz) => void;
   addPracticeQuestions: (questions: PracticeQuestion[]) => void;
@@ -227,9 +234,6 @@ export function AppStateProvider({
           return;
         }
 
-        /*
-         * If cloud data exists, it becomes the source of truth.
-         */
         if (data?.data) {
           const cloudData = {
             ...emptyData(),
@@ -248,12 +252,6 @@ export function AppStateProvider({
 
           writeLocalData(cloudData);
         } else {
-          /*
-           * First time this user is syncing.
-           *
-           * Upload existing local data so nothing already
-           * stored on the laptop is lost.
-           */
           const existingLocalData = readLocalData();
 
           const { error: uploadError } = await supabase
@@ -313,9 +311,6 @@ export function AppStateProvider({
       practiceQuestions,
     };
 
-    /*
-     * Keep local backup too.
-     */
     writeLocalData(currentData);
 
     if (saveTimer.current) {
@@ -415,6 +410,14 @@ export function AppStateProvider({
 
     setExams((prev) =>
       prev.filter((e) => e.subjectId !== id)
+    );
+
+    setNotes((prev) =>
+      prev.filter((n) => n.subjectId !== id)
+    );
+
+    setPracticeQuestions((prev) =>
+      prev.filter((q) => q.subjectId !== id)
     );
   }, []);
 
@@ -699,6 +702,122 @@ export function AppStateProvider({
     );
   }, []);
 
+  const reorderNotes = useCallback(
+    (subjectId: string, orderedIds: string[]) => {
+      setNotes((prev) => {
+        const subjectNotes = prev.filter(
+          (note) => note.subjectId === subjectId
+        );
+
+        const otherNotes = prev.filter(
+          (note) => note.subjectId !== subjectId
+        );
+
+        const orderedNotes = orderedIds
+          .map((id) =>
+            subjectNotes.find(
+              (note) => note.id === id
+            )
+          )
+          .filter(
+            (note): note is RevisionNote =>
+              note !== undefined
+          );
+
+        return [...otherNotes, ...orderedNotes];
+      });
+    },
+    []
+  );
+
+  const uploadNoteAttachment = useCallback(
+    async (
+      noteId: string,
+      file: File
+    ): Promise<NoteAttachment | null> => {
+      try {
+        const {
+          data: { user },
+          error: authError,
+        } = await supabase.auth.getUser();
+
+        if (authError || !user) {
+          console.error(
+            'No logged-in user found.'
+          );
+          return null;
+        }
+
+        const fileId = genId('file');
+
+        const safeFileName = file.name.replace(
+          /[^a-zA-Z0-9._-]/g,
+          '_'
+        );
+
+        const filePath =
+          `${user.id}/revision/${noteId}/${fileId}-${safeFileName}`;
+
+        const { error: uploadError } =
+          await supabase.storage
+            .from('note-attachments')
+            .upload(filePath, file, {
+              cacheControl: '3600',
+              upsert: false,
+            });
+
+        if (uploadError) {
+          console.error(
+            'Note attachment upload error:',
+            uploadError
+          );
+          return null;
+        }
+
+        const {
+          data: { publicUrl },
+        } = supabase.storage
+          .from('note-attachments')
+          .getPublicUrl(filePath);
+
+        const attachment: NoteAttachment = {
+          id: fileId,
+          noteId,
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          url: publicUrl,
+        };
+
+        setNotes((prev) =>
+          prev.map((note) => {
+            if (note.id !== noteId) {
+              return note;
+            }
+
+            return {
+              ...note,
+              attachments: [
+                ...(note.attachments || []),
+                attachment,
+              ],
+            };
+          })
+        );
+
+        return attachment;
+      } catch (error) {
+        console.error(
+          'Note attachment error:',
+          error
+        );
+
+        return null;
+      }
+    },
+    []
+  );
+
   const addGeneratedQuiz = useCallback(
     (quiz: Quiz) => {
       setGeneratedQuizzes((prev) => [
@@ -760,6 +879,8 @@ export function AppStateProvider({
     addNote,
     updateNote,
     deleteNote,
+    reorderNotes,
+    uploadNoteAttachment,
 
     addGeneratedQuiz,
     addPracticeQuestions,
