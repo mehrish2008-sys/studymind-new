@@ -1,0 +1,14 @@
+STUDYMIND AI SETUP
+
+1. Create a file named .env in this project folder (the same folder as package.json).
+2. Put exactly this line in it:
+   GEMINI_API_KEY=YOUR_GEMINI_KEY_HERE
+3. Save .env. Never paste the key into App.tsx, AIHelper.tsx, vite.config.ts, or screenshots.
+4. Open Command Prompt in this project folder.
+5. Run:
+   npm install
+6. Then run:
+   npm run dev
+7. Open the localhost URL shown by Vite.
+
+The app uses Google's Gemini Interactions API with the current stable gemini-3.6-flash model.
