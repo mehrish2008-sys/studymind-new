@@ -672,19 +672,25 @@ export function AppStateProvider({
     []
   );
 
+  /*
+   * ADD NOTE
+   *
+   * Return the generated ID so Revision.tsx can
+   * immediately upload attachments to that note.
+   */
   const addNote = useCallback(
-    (note: Omit<RevisionNote, 'id'>) => {
-      const id = genId('note');
+    (note: Omit<RevisionNote, 'id'>): string => {
+      const noteId = genId('note');
 
       setNotes((prev) => [
         ...prev,
         {
           ...note,
-          id,
+          id: noteId,
         },
       ]);
 
-      return id;
+      return noteId;
     },
     []
   );
@@ -737,6 +743,12 @@ export function AppStateProvider({
     []
   );
 
+  /*
+   * UPLOAD NOTE ATTACHMENT
+   *
+   * Files are stored in the private "study-notes"
+   * bucket and accessed using signed URLs.
+   */
   const uploadNoteAttachment = useCallback(
     async (
       noteId: string,
@@ -775,7 +787,7 @@ export function AppStateProvider({
 
         if (uploadError) {
           console.error(
-            'Note attachment upload error:',
+            'Study file upload error:',
             uploadError
           );
           return null;
@@ -828,7 +840,7 @@ export function AppStateProvider({
         return attachment;
       } catch (error) {
         console.error(
-          'Note attachment error:',
+          'Study file attachment error:',
           error
         );
 

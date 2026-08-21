@@ -5,7 +5,20 @@ import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { getSubjectColor } from '@/lib/utils';
-import { StickyNote, ChevronRight, FileText, CircleHelp as HelpCircle, Plus, Trash2, Pencil, X, Upload, File, Image as ImageIcon, Paperclip } from 'lucide-react';
+import {
+  StickyNote,
+  ChevronRight,
+  FileText,
+  CircleHelp as HelpCircle,
+  Plus,
+  Trash2,
+  Pencil,
+  X,
+  Upload,
+  File,
+  Image as ImageIcon,
+  Paperclip,
+} from 'lucide-react';
 
 export function Revision() {
   const {
@@ -43,6 +56,8 @@ export function Revision() {
   const [selectedFiles, setSelectedFiles] =
     useState<File[]>([]);
 
+  const [saving, setSaving] = useState(false);
+
   const fileInputRef =
     useRef<HTMLInputElement | null>(null);
 
@@ -76,12 +91,6 @@ export function Revision() {
     ]
   );
 
-  /*
-   * Read plain-text files automatically.
-   *
-   * This works for .txt, .md, .csv and other text files.
-   * PDFs, Word files and images are uploaded as attachments.
-   */
   const readTextFile = async (file: File) => {
     const textTypes = [
       'text/plain',
@@ -105,10 +114,6 @@ export function Revision() {
     }
   };
 
-  /*
-   * Handle files selected from the file picker
-   * or dropped into the drop zone.
-   */
   const handleFiles = async (files: FileList | File[]) => {
     const incomingFiles = Array.from(files);
 
@@ -119,10 +124,6 @@ export function Revision() {
       ...incomingFiles,
     ]);
 
-    /*
-     * If the user drops a text file while creating a note,
-     * automatically put its contents into the note.
-     */
     for (const file of incomingFiles) {
       const text = await readTextFile(file);
 
@@ -227,6 +228,7 @@ export function Revision() {
     setAdding(false);
     setSelectedFiles([]);
     setDragActive(false);
+    setSaving(false);
 
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
@@ -237,64 +239,67 @@ export function Revision() {
     if (
       !title.trim() ||
       !content.trim() ||
-      !selected
+      !selected ||
+      saving
     ) {
       return;
     }
 
-    const nextTopicId =
-      topicId ||
-      selectedTopicId ||
-      selected.topics[0]?.id ||
-      '';
+    setSaving(true);
 
-    const keyPoints = content
-      .split(/[.!?]/)
-      .map((x) => x.trim())
-      .filter(Boolean)
-      .slice(0, 5);
+    try {
+      const nextTopicId =
+        topicId ||
+        selectedTopicId ||
+        selected.topics[0]?.id ||
+        '';
 
-    /*
-     * Editing an existing note.
-     */
-    if (editingId) {
-      updateNote(editingId, {
-        title: title.trim(),
-        content: content.trim(),
-        topicId: nextTopicId,
-        keyPoints,
-      });
+      const keyPoints = content
+        .split(/[.!?]/)
+        .map((x) => x.trim())
+        .filter(Boolean)
+        .slice(0, 5);
 
-      /*
-       * Upload newly selected attachments.
-       */
-      for (const file of selectedFiles) {
-        await uploadNoteAttachment(
-          editingId,
-          file
-        );
+      if (editingId) {
+        updateNote(editingId, {
+          title: title.trim(),
+          content: content.trim(),
+          topicId: nextTopicId,
+          keyPoints,
+        });
+
+        for (const file of selectedFiles) {
+          await uploadNoteAttachment(
+            editingId,
+            file
+          );
+        }
+      } else {
+        const noteId = addNote({
+          subjectId: selected.id,
+          topicId: nextTopicId,
+          title: title.trim(),
+          content: content.trim(),
+          keyPoints,
+        });
+
+        for (const file of selectedFiles) {
+          await uploadNoteAttachment(
+            noteId,
+            file
+          );
+        }
       }
-    } else {
-      /*
-       * Create the note first.
-       */
-      const noteId = addNote({
-        subjectId: selected.id,
-        topicId: nextTopicId,
-        title: title.trim(),
-        content: content.trim(),
-        keyPoints,
-      });
 
-      /*
-       * Upload attachments for the newly created note.
-       */
-      for (const file of selectedFiles) {
-        await uploadNoteAttachment(noteId, file);
-      }
+      resetForm();
+    } catch (error) {
+      console.error(
+        'StudyMind note save error:',
+        error
+      );
+
+      setSaving(false);
     }
-
-    resetForm();
   };
 
   const editNote = (
@@ -308,9 +313,6 @@ export function Revision() {
     setAdding(true);
   };
 
-  /*
-   * SUBJECT SELECTION SCREEN
-   */
   if (!selectedSubjectId) {
     return (
       <div className="space-y-5">
@@ -376,9 +378,6 @@ export function Revision() {
     );
   }
 
-  /*
-   * SAFETY CHECK
-   */
   if (!selected) {
     setSelectedSubjectId(null);
     return null;
@@ -391,7 +390,6 @@ export function Revision() {
         subtitle={`${selected.name} • Your notes and practice questions`}
       />
 
-      {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
         <button
           onClick={() => {
@@ -411,7 +409,6 @@ export function Revision() {
         </span>
       </div>
 
-      {/* Topics */}
       <div className="flex gap-2 overflow-x-auto no-scrollbar">
         {[null, ...selected.topics.map((t) => t.id)].map(
           (id) => (
@@ -436,7 +433,6 @@ export function Revision() {
         )}
       </div>
 
-      {/* Tabs */}
       <div className="flex gap-2 bg-gray-100 rounded-xl p-1 w-fit">
         <button
           onClick={() => setTab('notes')}
@@ -471,7 +467,6 @@ export function Revision() {
 
       {tab === 'notes' ? (
         <>
-          {/* Add Note Button */}
           <div className="flex justify-end">
             <Button
               icon={
@@ -502,11 +497,9 @@ export function Revision() {
             </Button>
           </div>
 
-          {/* Add/Edit Note */}
           {adding && (
             <Card>
               <div className="space-y-4">
-                {/* Title */}
                 <input
                   value={title}
                   onChange={(e) =>
@@ -516,7 +509,6 @@ export function Revision() {
                   className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm"
                 />
 
-                {/* Topic */}
                 <select
                   value={topicId}
                   onChange={(e) =>
@@ -538,7 +530,6 @@ export function Revision() {
                   ))}
                 </select>
 
-                {/* Drag & Drop */}
                 <div
                   onDragEnter={handleDragOver}
                   onDragOver={handleDragOver}
@@ -585,7 +576,6 @@ export function Revision() {
                   </p>
                 </div>
 
-                {/* Selected files */}
                 {selectedFiles.length > 0 && (
                   <div className="space-y-2">
                     <p className="text-xs font-semibold text-gray-500">
@@ -630,7 +620,6 @@ export function Revision() {
                   </div>
                 )}
 
-                {/* Note content */}
                 <textarea
                   value={content}
                   onChange={(e) =>
@@ -641,16 +630,18 @@ export function Revision() {
                   className="w-full rounded-xl border border-gray-200 px-3 py-3 text-sm resize-y"
                 />
 
-                {/* Save buttons */}
                 <div className="flex gap-2">
                   <Button
                     onClick={saveNote}
                     disabled={
                       !title.trim() ||
-                      !content.trim()
+                      !content.trim() ||
+                      saving
                     }
                   >
-                    {editingId
+                    {saving
+                      ? 'Saving...'
+                      : editingId
                       ? 'Save Changes'
                       : 'Save Note'}
                   </Button>
@@ -659,6 +650,7 @@ export function Revision() {
                     <Button
                       variant="secondary"
                       onClick={resetForm}
+                      disabled={saving}
                     >
                       Cancel
                     </Button>
@@ -668,7 +660,6 @@ export function Revision() {
             </Card>
           )}
 
-          {/* Notes */}
           {filteredNotes.length === 0 ? (
             <Card>
               <EmptyState
@@ -691,7 +682,6 @@ export function Revision() {
                         {n.content}
                       </p>
 
-                      {/* Attachments */}
                       {n.attachments &&
                         n.attachments.length > 0 && (
                           <div className="mt-4 space-y-2">
@@ -705,11 +695,14 @@ export function Revision() {
                                 <button
                                   key={attachment.id}
                                   onClick={async () => {
-                                    if (attachment.path) {
+                                    if (
+                                      attachment.path
+                                    ) {
                                       const signedUrl =
                                         await getAttachmentSignedUrl(
                                           attachment.path
                                         );
+
                                       if (signedUrl) {
                                         window.open(
                                           signedUrl,
@@ -740,9 +733,7 @@ export function Revision() {
 
                                   <div className="min-w-0 flex-1">
                                     <p className="text-sm font-semibold truncate">
-                                      {
-                                        attachment.name
-                                      }
+                                      {attachment.name}
                                     </p>
 
                                     <p className="text-xs text-gray-400">
@@ -787,7 +778,6 @@ export function Revision() {
         </>
       ) : (
         <>
-          {/* Practice Questions */}
           {filteredQuestions.length === 0 ? (
             <Card>
               <EmptyState
