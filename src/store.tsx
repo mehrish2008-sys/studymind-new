@@ -1,4 +1,3 @@
-
 import {
   createContext,
   useContext,
@@ -239,7 +238,7 @@ export function AppStateProvider({
         }
 
         if (data?.data) {
-          const cloudData = {
+          const cloudData: StoredAppData = {
             ...emptyData(),
             ...(data.data as Partial<StoredAppData>),
           };
@@ -768,7 +767,7 @@ export function AppStateProvider({
 
         const { error: uploadError } =
           await supabase.storage
-            .from('note-attachments')
+            .from('study-notes')
             .upload(filePath, file, {
               cacheControl: '3600',
               upsert: false,
@@ -786,10 +785,13 @@ export function AppStateProvider({
           data: signedUrlData,
           error: signedUrlError,
         } = await supabase.storage
-          .from('note-attachments')
+          .from('study-notes')
           .createSignedUrl(filePath, 3600);
 
-        if (signedUrlError || !signedUrlData?.signedUrl) {
+        if (
+          signedUrlError ||
+          !signedUrlData?.signedUrl
+        ) {
           console.error(
             'Signed URL error:',
             signedUrlError
@@ -843,7 +845,7 @@ export function AppStateProvider({
           data,
           error,
         } = await supabase.storage
-          .from('note-attachments')
+          .from('study-notes')
           .createSignedUrl(path, 3600);
 
         if (error || !data?.signedUrl) {
@@ -953,4 +955,3 @@ export function useApp(): AppState {
 
   return ctx;
 }
-
