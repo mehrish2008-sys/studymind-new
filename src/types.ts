@@ -103,6 +103,7 @@ export interface NoteAttachment {
   type: string;
   url: string;
   size: number;
+  path: string;
 }
 
 

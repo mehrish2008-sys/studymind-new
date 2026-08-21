@@ -70,7 +70,7 @@ interface AppState {
 
   removeSavedResource: (id: string) => void;
 
-  addNote: (note: Omit<RevisionNote, 'id'>) => void;
+  addNote: (note: Omit<RevisionNote, 'id'>) => string;
   updateNote: (id: string, updates: Partial<RevisionNote>) => void;
   deleteNote: (id: string) => void;
   reorderNotes: (subjectId: string, orderedIds: string[]) => void;
@@ -79,6 +79,10 @@ interface AppState {
     noteId: string,
     file: File
   ) => Promise<NoteAttachment | null>;
+
+  getAttachmentSignedUrl: (
+    path: string
+  ) => Promise<string | null>;
 
   addGeneratedQuiz: (quiz: Quiz) => void;
   addPracticeQuestions: (questions: PracticeQuestion[]) => void;
@@ -671,13 +675,17 @@ export function AppStateProvider({
 
   const addNote = useCallback(
     (note: Omit<RevisionNote, 'id'>) => {
+      const id = genId('note');
+
       setNotes((prev) => [
         ...prev,
         {
           ...note,
-          id: genId('note'),
+          id,
         },
       ]);
+
+      return id;
     },
     []
   );
@@ -775,10 +783,19 @@ export function AppStateProvider({
         }
 
         const {
-          data: { publicUrl },
-        } = supabase.storage
+          data: signedUrlData,
+          error: signedUrlError,
+        } = await supabase.storage
           .from('note-attachments')
-          .getPublicUrl(filePath);
+          .createSignedUrl(filePath, 3600);
+
+        if (signedUrlError || !signedUrlData?.signedUrl) {
+          console.error(
+            'Signed URL error:',
+            signedUrlError
+          );
+          return null;
+        }
 
         const attachment: NoteAttachment = {
           id: fileId,
@@ -786,7 +803,8 @@ export function AppStateProvider({
           name: file.name,
           type: file.type,
           size: file.size,
-          url: publicUrl,
+          url: signedUrlData.signedUrl,
+          path: filePath,
         };
 
         setNotes((prev) =>
@@ -812,6 +830,36 @@ export function AppStateProvider({
           error
         );
 
+        return null;
+      }
+    },
+    []
+  );
+
+  const getAttachmentSignedUrl = useCallback(
+    async (path: string): Promise<string | null> => {
+      try {
+        const {
+          data,
+          error,
+        } = await supabase.storage
+          .from('note-attachments')
+          .createSignedUrl(path, 3600);
+
+        if (error || !data?.signedUrl) {
+          console.error(
+            'Signed URL refresh error:',
+            error
+          );
+          return null;
+        }
+
+        return data.signedUrl;
+      } catch (error) {
+        console.error(
+          'Signed URL error:',
+          error
+        );
         return null;
       }
     },
@@ -881,6 +929,7 @@ export function AppStateProvider({
     deleteNote,
     reorderNotes,
     uploadNoteAttachment,
+    getAttachmentSignedUrl,
 
     addGeneratedQuiz,
     addPracticeQuestions,

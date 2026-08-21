@@ -5,20 +5,7 @@ import { Button } from '@/components/Button';
 import { EmptyState } from '@/components/EmptyState';
 import { PageHeader } from '@/components/PageHeader';
 import { getSubjectColor } from '@/lib/utils';
-import {
-  StickyNote,
-  ChevronRight,
-  FileText,
-  HelpCircle,
-  Plus,
-  Trash2,
-  Pencil,
-  X,
-  Upload,
-  File,
-  Image as ImageIcon,
-  Paperclip,
-} from 'lucide-react';
+import { StickyNote, ChevronRight, FileText, CircleHelp as HelpCircle, Plus, Trash2, Pencil, X, Upload, File, Image as ImageIcon, Paperclip } from 'lucide-react';
 
 export function Revision() {
   const {
@@ -29,6 +16,7 @@ export function Revision() {
     deleteNote,
     practiceQuestions,
     uploadNoteAttachment,
+    getAttachmentSignedUrl,
   } = useApp();
 
   const [selectedSubjectId, setSelectedSubjectId] =
@@ -290,11 +278,7 @@ export function Revision() {
       /*
        * Create the note first.
        */
-      const noteId = `note-${Date.now()}-${Math.random()
-        .toString(36)
-        .slice(2, 7)}`;
-
-      addNote({
+      const noteId = addNote({
         subjectId: selected.id,
         topicId: nextTopicId,
         title: title.trim(),
@@ -303,15 +287,11 @@ export function Revision() {
       });
 
       /*
-       * The store generates its own note ID,
-       * so attachments for a brand-new note cannot
-       * safely be uploaded here without changing the
-       * store API.
-       *
-       * The files remain selected until the note is saved,
-       * but existing notes can upload attachments directly.
+       * Upload attachments for the newly created note.
        */
-      void noteId;
+      for (const file of selectedFiles) {
+        await uploadNoteAttachment(noteId, file);
+      }
     }
 
     resetForm();
@@ -722,14 +702,28 @@ export function Revision() {
 
                             {n.attachments.map(
                               (attachment) => (
-                                <a
+                                <button
                                   key={attachment.id}
-                                  href={
-                                    attachment.url
-                                  }
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 hover:bg-gray-100"
+                                  onClick={async () => {
+                                    if (attachment.path) {
+                                      const signedUrl =
+                                        await getAttachmentSignedUrl(
+                                          attachment.path
+                                        );
+                                      if (signedUrl) {
+                                        window.open(
+                                          signedUrl,
+                                          '_blank'
+                                        );
+                                      }
+                                    } else {
+                                      window.open(
+                                        attachment.url,
+                                        '_blank'
+                                      );
+                                    }
+                                  }}
+                                  className="flex items-center gap-3 rounded-xl border border-gray-200 bg-gray-50 p-3 hover:bg-gray-100 text-left w-full"
                                 >
                                   {attachment.type ===
                                   'image' ? (
@@ -757,7 +751,7 @@ export function Revision() {
                                       )}
                                     </p>
                                   </div>
-                                </a>
+                                </button>
                               )
                             )}
                           </div>
