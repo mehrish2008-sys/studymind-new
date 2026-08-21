@@ -5,13 +5,21 @@ import { ResetPassword } from '@/sections/ResetPassword';
 export function Auth({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+
   const [isSignUp, setIsSignUp] = useState(false);
   const [forgotPassword, setForgotPassword] = useState(false);
+
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
-  const [isRecoveringPassword, setIsRecoveringPassword] = useState(false);
+
+  const [isRecoveringPassword, setIsRecoveringPassword] =
+    useState(false);
+
+  const [resendingConfirmation, setResendingConfirmation] =
+    useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
@@ -32,7 +40,9 @@ export function Auth({ children }: { children: React.ReactNode }) {
     return () => subscription.unsubscribe();
   }, []);
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
+  const handleForgotPassword = async (
+    e: React.FormEvent
+  ) => {
     e.preventDefault();
 
     setError('');
@@ -43,12 +53,13 @@ export function Auth({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    const { error } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      {
-        redirectTo: `${window.location.origin}/reset-password`,
-      }
-    );
+    const { error } =
+      await supabase.auth.resetPasswordForEmail(
+        email.trim(),
+        {
+          redirectTo: `${window.location.origin}/reset-password`,
+        }
+      );
 
     if (error) {
       setError(error.message);
@@ -60,27 +71,28 @@ export function Auth({ children }: { children: React.ReactNode }) {
     );
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleResendConfirmation = async () => {
     setError('');
     setMessage('');
 
-    if (!email.trim() || !password.trim()) {
-      setError('Please enter your email and password.');
+    if (!email.trim()) {
+      setError(
+        'Please enter your email address first.'
+      );
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters.');
-      return;
-    }
+    setResendingConfirmation(true);
 
-    if (isSignUp) {
-      const { error } = await supabase.auth.signUp({
-        email: email.trim(),
-        password,
-      });
+    try {
+      const { error } =
+        await supabase.auth.resend({
+          type: 'signup',
+          email: email.trim(),
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
 
       if (error) {
         setError(error.message);
@@ -88,13 +100,73 @@ export function Auth({ children }: { children: React.ReactNode }) {
       }
 
       setMessage(
+        'Confirmation email resent! Check your inbox.'
+      );
+    } catch (error) {
+      console.error(
+        'StudyMind confirmation resend error:',
+        error
+      );
+
+      setError(
+        'Could not resend the confirmation email. Please try again.'
+      );
+    } finally {
+      setResendingConfirmation(false);
+    }
+  };
+
+  const handleSubmit = async (
+    e: React.FormEvent
+  ) => {
+    e.preventDefault();
+
+    setError('');
+    setMessage('');
+
+    if (!email.trim() || !password.trim()) {
+      setError(
+        'Please enter your email and password.'
+      );
+      return;
+    }
+
+    if (password.length < 6) {
+      setError(
+        'Password must be at least 6 characters.'
+      );
+      return;
+    }
+
+    if (isSignUp) {
+      const { data, error } =
+        await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/`,
+          },
+        });
+
+      if (error) {
+        setError(error.message);
+        return;
+      }
+
+      if (data.session) {
+        setSession(data.session);
+        return;
+      }
+
+      setMessage(
         'Account created! Check your email to confirm your account.'
       );
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email: email.trim(),
-        password,
-      });
+      const { error } =
+        await supabase.auth.signInWithPassword({
+          email: email.trim(),
+          password,
+        });
 
       if (error) {
         setError(error.message);
@@ -120,7 +192,6 @@ export function Auth({ children }: { children: React.ReactNode }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 px-4">
         <div className="w-full max-w-md bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
-
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-gray-900">
               StudyMind
@@ -138,7 +209,8 @@ export function Auth({ children }: { children: React.ReactNode }) {
               </h2>
 
               <p className="text-sm text-gray-500 mb-5">
-                Enter your email and we'll send you a password reset link.
+                Enter your email and we'll send you a
+                password reset link.
               </p>
 
               <form
@@ -148,7 +220,9 @@ export function Auth({ children }: { children: React.ReactNode }) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) =>
+                    setEmail(e.target.value)
+                  }
                   placeholder="Email address"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
@@ -188,7 +262,9 @@ export function Auth({ children }: { children: React.ReactNode }) {
           ) : (
             <>
               <h2 className="text-xl font-bold text-gray-900 mb-1">
-                {isSignUp ? 'Create your account' : 'Welcome back'}
+                {isSignUp
+                  ? 'Create your account'
+                  : 'Welcome back'}
               </h2>
 
               <p className="text-sm text-gray-500 mb-5">
@@ -204,7 +280,9 @@ export function Auth({ children }: { children: React.ReactNode }) {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  onChange={(e) =>
+                    setEmail(e.target.value)
+                  }
                   placeholder="Email address"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
@@ -212,7 +290,9 @@ export function Auth({ children }: { children: React.ReactNode }) {
                 <input
                   type="password"
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  onChange={(e) =>
+                    setPassword(e.target.value)
+                  }
                   placeholder="Password"
                   className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm"
                 />
@@ -233,9 +313,24 @@ export function Auth({ children }: { children: React.ReactNode }) {
                   type="submit"
                   className="w-full rounded-xl bg-brand-500 text-white py-3 font-semibold hover:opacity-90"
                 >
-                  {isSignUp ? 'Create Account' : 'Log In'}
+                  {isSignUp
+                    ? 'Create Account'
+                    : 'Log In'}
                 </button>
               </form>
+
+              {isSignUp && (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendingConfirmation}
+                  className="w-full mt-4 text-sm text-brand-600 hover:underline disabled:opacity-50"
+                >
+                  {resendingConfirmation
+                    ? 'Resending...'
+                    : 'Resend confirmation email'}
+                </button>
+              )}
 
               {!isSignUp && (
                 <button
@@ -273,3 +368,4 @@ export function Auth({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
