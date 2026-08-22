@@ -698,15 +698,36 @@ export function Revision() {
                                     if (
                                       attachment.path
                                     ) {
+                                      /*
+                                       * Open the tab synchronously, in direct
+                                       * response to the click, BEFORE the
+                                       * signed URL is fetched. Browsers (esp.
+                                       * Safari and mobile Chrome) block
+                                       * window.open() calls that happen after
+                                       * an await, since by then it no longer
+                                       * looks like a direct user action.
+                                       */
+                                      const newTab =
+                                        window.open(
+                                          '',
+                                          '_blank'
+                                        );
+
                                       const signedUrl =
                                         await getAttachmentSignedUrl(
                                           attachment.path
                                         );
 
-                                      if (signedUrl) {
-                                        window.open(
-                                          signedUrl,
-                                          '_blank'
+                                      if (
+                                        signedUrl &&
+                                        newTab
+                                      ) {
+                                        newTab.location.href =
+                                          signedUrl;
+                                      } else {
+                                        newTab?.close();
+                                        window.alert(
+                                          `Couldn't open "${attachment.name}". It may have been removed from storage, or your connection dropped — please try again.`
                                         );
                                       }
                                     } else {
