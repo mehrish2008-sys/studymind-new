@@ -18,9 +18,6 @@ export function Auth({ children }: { children: React.ReactNode }) {
   const [isRecoveringPassword, setIsRecoveringPassword] =
     useState(false);
 
-  const [resendingConfirmation, setResendingConfirmation] =
-    useState(false);
-
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
       setSession(data.session);
@@ -69,51 +66,6 @@ export function Auth({ children }: { children: React.ReactNode }) {
     setMessage(
       'Password reset email sent! Check your inbox.'
     );
-  };
-
-  const handleResendConfirmation = async () => {
-    setError('');
-    setMessage('');
-
-    if (!email.trim()) {
-      setError(
-        'Please enter your email address first.'
-      );
-      return;
-    }
-
-    setResendingConfirmation(true);
-
-    try {
-      const { error } =
-        await supabase.auth.resend({
-          type: 'signup',
-          email: email.trim(),
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
-        });
-
-      if (error) {
-        setError(error.message);
-        return;
-      }
-
-      setMessage(
-        'Confirmation email resent! Check your inbox.'
-      );
-    } catch (error) {
-      console.error(
-        'StudyMind confirmation resend error:',
-        error
-      );
-
-      setError(
-        'Could not resend the confirmation email. Please try again.'
-      );
-    } finally {
-      setResendingConfirmation(false);
-    }
   };
 
   const handleSubmit = async (
@@ -319,19 +271,6 @@ export function Auth({ children }: { children: React.ReactNode }) {
                 </button>
               </form>
 
-              {isSignUp && (
-                <button
-                  type="button"
-                  onClick={handleResendConfirmation}
-                  disabled={resendingConfirmation}
-                  className="w-full mt-4 text-sm text-brand-600 hover:underline disabled:opacity-50"
-                >
-                  {resendingConfirmation
-                    ? 'Resending...'
-                    : 'Resend confirmation email'}
-                </button>
-              )}
-
               {!isSignUp && (
                 <button
                   type="button"
@@ -368,4 +307,3 @@ export function Auth({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
-
